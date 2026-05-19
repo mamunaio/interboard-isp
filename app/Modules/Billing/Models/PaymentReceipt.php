@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing\Models;
 
+use App\Core\Audit\Traits\LogsActivity;
 use App\Core\Tenant\Traits\BelongsToTenant;
 use App\Modules\Billing\Enums\PaymentMethod;
 use App\Modules\Billing\Enums\ReceiptStatus;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PaymentReceipt extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, LogsActivity;
 
     protected $table = 'payment_receipts';
 

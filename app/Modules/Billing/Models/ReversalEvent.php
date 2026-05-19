@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing\Models;
 
+use App\Core\Audit\Traits\LogsActivity;
 use App\Core\Tenant\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ReversalEvent extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, LogsActivity;
 
     protected $table = 'reversal_events';
 

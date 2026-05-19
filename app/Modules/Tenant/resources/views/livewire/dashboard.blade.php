@@ -89,6 +89,63 @@
         </div>
     </div>
 
+    <!-- Billing & Financial Telemetry -->
+    <div class="mb-8">
+        <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <span class="w-2.5 h-6 bg-gradient-to-b from-cyan-400 to-indigo-500 rounded-full"></span>
+            Billing & Collections Telemetry
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Card 1: Total BDT Collections -->
+            <div class="relative overflow-hidden bg-slate-900 border border-slate-800 hover:border-emerald-500/50 transition duration-300 rounded-3xl p-6 shadow-2xl group">
+                <div class="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/20 transition duration-300"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-sm font-medium text-slate-400">Total BDT Collections</span>
+                    <div class="p-2.5 bg-emerald-950/50 text-emerald-400 border border-emerald-900 rounded-2xl">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                </div>
+                <div class="text-3xl font-black text-white tracking-tight">{{ $stats['total_collected'] }} BDT</div>
+                <div class="flex items-center gap-2 mt-2">
+                    <span class="text-xs font-semibold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded-full border border-emerald-900">Real-time</span>
+                    <span class="text-xs text-slate-500">ledger verified collections</span>
+                </div>
+            </div>
+
+            <!-- Card 2: Pending Webhook Attempts -->
+            <div class="relative overflow-hidden bg-slate-900 border border-slate-800 hover:border-indigo-500/50 transition duration-300 rounded-3xl p-6 shadow-2xl group">
+                <div class="absolute -right-4 -top-4 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl group-hover:bg-indigo-500/20 transition duration-300"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-sm font-medium text-slate-400">Pending Gateway Attempts</span>
+                    <div class="p-2.5 bg-indigo-950/50 text-indigo-400 border border-indigo-900 rounded-2xl">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                    </div>
+                </div>
+                <div class="text-3xl font-black text-white tracking-tight">{{ $stats['pending_gateway'] }} Attempts</div>
+                <div class="flex items-center gap-2 mt-2">
+                    <span class="text-xs font-semibold text-indigo-400 bg-indigo-950/50 px-2 py-0.5 rounded-full border border-indigo-900">Checkout</span>
+                    <span class="text-xs text-slate-500">awaiting gateway callbacks</span>
+                </div>
+            </div>
+
+            <!-- Card 3: Unpaid Invoices -->
+            <div class="relative overflow-hidden bg-slate-900 border border-slate-800 hover:border-amber-500/50 transition duration-300 rounded-3xl p-6 shadow-2xl group">
+                <div class="absolute -right-4 -top-4 w-24 h-24 bg-amber-500/10 rounded-full blur-xl group-hover:bg-amber-500/20 transition duration-300"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-sm font-medium text-slate-400">Outstanding Invoices</span>
+                    <div class="p-2.5 bg-amber-950/50 text-amber-400 border border-amber-900 rounded-2xl">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                </div>
+                <div class="text-3xl font-black text-white tracking-tight">{{ $stats['unpaid_invoices'] }} Outstanding</div>
+                <div class="flex items-center gap-2 mt-2">
+                    <span class="text-xs font-semibold text-rose-400 bg-rose-950/50 px-2 py-0.5 rounded-full border border-rose-900">Active</span>
+                    <span class="text-xs text-slate-500">requiring payment recovery</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Live Bandwidth & Activity logs stream layout -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Live traffic analyzer -->

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing\Models;
 
+use App\Core\Audit\Traits\LogsActivity;
 use App\Core\Tenant\Traits\BelongsToTenant;
 use App\Modules\Customer\Models\Customer;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class GatewayPaymentAttempt extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, LogsActivity;
 
     protected $table = 'gateway_payment_attempts';
 
