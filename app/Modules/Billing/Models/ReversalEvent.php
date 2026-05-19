@@ -25,6 +25,7 @@ class ReversalEvent extends Model
         'currency',
         'reason',
         'reversal_ledger_entry_id',
+        'idempotency_key',
         'created_by_type',
         'created_by_id',
     ];

@@ -15,8 +15,10 @@ use App\Modules\Billing\Enums\InvoiceType;
 use App\Modules\Billing\Enums\TransactionType;
 use App\Modules\Billing\Enums\TransactionDirection;
 use App\Modules\Customer\Models\Customer;
+use App\Modules\Auth\Models\StaffUser;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Auth\Access\AuthorizationException;
 
 class ReversalAdjustmentService
 {
@@ -28,22 +30,30 @@ class ReversalAdjustmentService
     /**
      * Reverse a posted payment receipt without mutating historical models.
      */
-    public function reverseReceipt(int $tenantId, int $receiptId, string $reason, array $options = []): ReversalEvent
-    {
+    public function reverseReceipt(
+        int $tenantId,
+        int $receiptId,
+        string $reason,
+        StaffUser $actor,
+        array $options = []
+    ): ReversalEvent {
+        // 1. Strict RBAC Enforcement
+        $this->authorize($actor, 'billing.receipt.reverse');
+
         if (empty(trim($reason))) {
             throw ValidationException::withMessages([
                 'reason' => ['An explicit reason is required to perform a receipt reversal.']
             ]);
         }
 
-        return DB::transaction(function () use ($tenantId, $receiptId, $reason, $options) {
-            // 1. Lock receipt
+        return DB::transaction(function () use ($tenantId, $receiptId, $reason, $actor, $options) {
+            // 2. Lock receipt
             $receipt = PaymentReceipt::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->lockForUpdate()
                 ->findOrFail($receiptId);
 
-            // 2. Prevent double reversal by checking ReversalEvent existence
+            // 3. Prevent double reversal by checking ReversalEvent existence
             $alreadyReversed = ReversalEvent::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('original_entity_type', PaymentReceipt::class)
@@ -57,7 +67,7 @@ class ReversalAdjustmentService
                 ]);
             }
 
-            // 3. Lock customer wallet
+            // 4. Lock customer wallet
             $wallet = Wallet::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('owner_type', Customer::class)
@@ -66,11 +76,11 @@ class ReversalAdjustmentService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            // 4. Unwind allocations specifically linked to this receipt's metadata provenance
+            // 5. Unwind allocations specifically linked to this receipt's explicit relational provenance
             $allocations = PaymentAllocation::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('wallet_id', $wallet->id)
-                ->where('metadata->payment_receipt_id', $receipt->id)
+                ->where('payment_receipt_id', $receipt->id)
                 ->lockForUpdate()
                 ->get();
 
@@ -96,9 +106,9 @@ class ReversalAdjustmentService
                     'reason' => "Receipt {$receipt->receipt_number} reversed.",
                 ]);
 
-                // Issue compensating Debit Adjustment Invoice representing the restored debt
+                // Issue compensating MANUAL_ADJUSTMENT Invoice representing the restored debt
                 $chargeInvoice = $this->invoiceService->createInvoice($tenantId, $receipt->customer_id, [
-                    'invoice_type' => InvoiceType::SUBSCRIPTION->value,
+                    'invoice_type' => InvoiceType::MANUAL_ADJUSTMENT->value,
                     'issue_date' => now()->toDateString(),
                     'due_date' => now()->addDays(7)->toDateString(),
                     'notes' => "Compensating invoice for reversed allocation on Receipt {$receipt->receipt_number}.",
@@ -121,13 +131,13 @@ class ReversalAdjustmentService
                     TransactionType::PAYMENT_ALLOCATION_REVERSAL->value,
                     [
                         'notes' => "Compensating credit for reversed allocation of Receipt {$receipt->receipt_number}.",
-                        'created_by_type' => $options['created_by_type'] ?? null,
-                        'created_by_id' => $options['created_by_id'] ?? null,
+                        'created_by_type' => 'StaffUser',
+                        'created_by_id' => $actor->id,
                     ]
                 );
             }
 
-            // 5. Post main receipt DEBIT to deduct original amount from wallet
+            // 6. Post main receipt DEBIT to deduct original amount from wallet
             $amountToDebit = (string)$receipt->amount;
             $ledgerEntry = $this->walletService->mutateBalance(
                 $tenantId,
@@ -137,12 +147,12 @@ class ReversalAdjustmentService
                 TransactionType::PAYMENT_RECEIPT_REVERSAL->value,
                 [
                     'notes' => "Reversal of receipt {$receipt->receipt_number}. Reason: {$reason}",
-                    'created_by_type' => $options['created_by_type'] ?? null,
-                    'created_by_id' => $options['created_by_id'] ?? null,
+                    'created_by_type' => 'StaffUser',
+                    'created_by_id' => $actor->id,
                 ]
             );
 
-            // 6. Write Immutable ReversalEvent Audit entry
+            // 7. Write Immutable ReversalEvent Audit entry
             return ReversalEvent::create([
                 'tenant_id' => $tenantId,
                 'original_entity_type' => PaymentReceipt::class,
@@ -152,17 +162,29 @@ class ReversalAdjustmentService
                 'currency' => $receipt->currency,
                 'reason' => $reason,
                 'reversal_ledger_entry_id' => $ledgerEntry->id,
-                'created_by_type' => $options['created_by_type'] ?? null,
-                'created_by_id' => $options['created_by_id'] ?? null,
+                'idempotency_key' => $options['idempotency_key'] ?? null,
+                'created_by_type' => 'StaffUser',
+                'created_by_id' => $actor->id,
             ]);
         });
     }
 
     /**
-     * Perform a manual financial adjustment (credit, debit, waiver, penalty).
+     * Perform a manual financial adjustment (credit, debit, waiver, penalty) with idempotency protection.
      */
-    public function adjustBalance(int $tenantId, int $customerId, string $type, string $amount, string $currency, string $reason, array $options = []): ReversalEvent
-    {
+    public function adjustBalance(
+        int $tenantId,
+        int $customerId,
+        string $type,
+        string $amount,
+        string $currency,
+        string $reason,
+        StaffUser $actor,
+        array $options = []
+    ): ReversalEvent {
+        // 1. Strict RBAC Enforcement
+        $this->authorize($actor, 'billing.adjustment.manage');
+
         $typeEnum = TransactionType::tryFrom($type);
         if (!$typeEnum || !in_array($typeEnum, [
             TransactionType::CREDIT_ADJUSTMENT,
@@ -188,7 +210,20 @@ class ReversalAdjustmentService
             ]);
         }
 
-        return DB::transaction(function () use ($tenantId, $customerId, $typeEnum, $amountStr, $currency, $reason, $options) {
+        return DB::transaction(function () use ($tenantId, $customerId, $typeEnum, $amountStr, $currency, $reason, $actor, $options) {
+            // 2. Lock-Safe Idempotency Check
+            if (!empty($options['idempotency_key'])) {
+                $existing = ReversalEvent::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('idempotency_key', $options['idempotency_key'])
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($existing) {
+                    return $existing;
+                }
+            }
+
             $customer = Customer::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->lockForUpdate()
@@ -215,8 +250,8 @@ class ReversalAdjustmentService
                 $typeEnum->value,
                 [
                     'notes' => "Manual adjustment: {$reason}",
-                    'created_by_type' => $options['created_by_type'] ?? null,
-                    'created_by_id' => $options['created_by_id'] ?? null,
+                    'created_by_type' => 'StaffUser',
+                    'created_by_id' => $actor->id,
                 ]
             );
 
@@ -230,9 +265,25 @@ class ReversalAdjustmentService
                 'currency' => $currency,
                 'reason' => $reason,
                 'reversal_ledger_entry_id' => $ledgerEntry->id,
-                'created_by_type' => $options['created_by_type'] ?? null,
-                'created_by_id' => $options['created_by_id'] ?? null,
+                'idempotency_key' => $options['idempotency_key'] ?? null,
+                'created_by_type' => 'StaffUser',
+                'created_by_id' => $actor->id,
             ]);
         });
+    }
+
+    /**
+     * Enforce staff permission policy.
+     */
+    protected function authorize(StaffUser $user, string $permissionSlug): void
+    {
+        $hasPermission = $user->roles()
+            ->whereHas('permissions', function ($query) use ($permissionSlug) {
+                $query->where('slug', $permissionSlug);
+            })->exists();
+
+        if (!$hasPermission) {
+            throw new AuthorizationException("Unauthorized: Missing required permission [{$permissionSlug}].");
+        }
     }
 }

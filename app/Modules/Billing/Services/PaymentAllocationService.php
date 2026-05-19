@@ -194,6 +194,7 @@ class PaymentAllocationService
                     'invoice_id' => $item['invoice_id'],
                     'wallet_id' => $wallet->id,
                     'ledger_entry_id' => $ledger->id,
+                    'payment_receipt_id' => $options['payment_receipt_id'] ?? null,
                     'allocation_amount' => $item['allocation_amount'],
                     'allocation_order' => $item['allocation_order'],
                     'idempotency_key' => $options['idempotency_key'] ?? null,

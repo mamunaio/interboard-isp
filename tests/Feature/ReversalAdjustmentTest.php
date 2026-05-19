@@ -24,8 +24,12 @@ use App\Modules\Billing\Services\WalletService;
 use App\Modules\Billing\Services\InvoiceService;
 use App\Modules\Customer\Models\Customer;
 use App\Modules\Tenant\Models\Tenant;
+use App\Modules\Auth\Models\StaffUser;
+use App\Modules\Auth\Models\Role;
+use App\Modules\Auth\Models\Permission;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Tests\TestCase;
 use RuntimeException;
 
@@ -36,6 +40,8 @@ class ReversalAdjustmentTest extends TestCase
     protected Tenant $tenant;
     protected Customer $customer;
     protected Wallet $wallet;
+    protected StaffUser $authorizedStaff;
+    protected StaffUser $unauthorizedStaff;
     protected PaymentReceiptService $receiptService;
     protected ReversalAdjustmentService $reversalService;
 
@@ -71,6 +77,44 @@ class ReversalAdjustmentTest extends TestCase
         // Pre-create wallet for customer
         $walletService = app(WalletService::class);
         $this->wallet = $walletService->createWallet($this->tenant->id, Customer::class, $this->customer->id, 'BDT');
+
+        // Create Permissions
+        $reversePerm = Permission::create([
+            'module' => 'billing',
+            'action' => 'reverse_receipt',
+            'slug' => 'billing.receipt.reverse',
+        ]);
+
+        $adjustPerm = Permission::create([
+            'module' => 'billing',
+            'action' => 'manage_adjustment',
+            'slug' => 'billing.adjustment.manage',
+        ]);
+
+        // Create Roles
+        $billingAdminRole = Role::create(['name' => 'Billing Admin', 'slug' => 'billing-admin']);
+        $billingAdminRole->permissions()->attach([$reversePerm->id, $adjustPerm->id]);
+
+        $guestRole = Role::create(['name' => 'Billing Guest', 'slug' => 'billing-guest']);
+
+        // Create Staff Users
+        $this->authorizedStaff = StaffUser::create([
+            'name' => 'Authorized Billing Agent',
+            'email' => 'auth@tenant-a.com',
+            'password' => 'secret123',
+            'status' => 'active',
+            'tenant_id' => $this->tenant->id,
+        ]);
+        $this->authorizedStaff->roles()->attach($billingAdminRole->id);
+
+        $this->unauthorizedStaff = StaffUser::create([
+            'name' => 'Unauthorized Clerk',
+            'email' => 'unauth@tenant-a.com',
+            'password' => 'secret123',
+            'status' => 'active',
+            'tenant_id' => $this->tenant->id,
+        ]);
+        $this->unauthorizedStaff->roles()->attach($guestRole->id);
     }
 
     /**
@@ -88,7 +132,12 @@ class ReversalAdjustmentTest extends TestCase
         $this->wallet->refresh();
         $this->assertEquals('1000.0000', (string)$this->wallet->current_balance);
 
-        $reversal = $this->reversalService->reverseReceipt($this->tenant->id, $receipt->id, 'Double payment intake mistake.');
+        $reversal = $this->reversalService->reverseReceipt(
+            $this->tenant->id,
+            $receipt->id,
+            'Double payment intake mistake.',
+            $this->authorizedStaff
+        );
 
         $this->assertNotNull($reversal);
         $this->assertEquals(PaymentReceipt::class, $reversal->original_entity_type);
@@ -162,7 +211,12 @@ class ReversalAdjustmentTest extends TestCase
         $this->assertCount(2, $allocations);
 
         // Unwind/Reverse Receipt A (BDT 1000)
-        $this->reversalService->reverseReceipt($this->tenant->id, $receiptA->id, 'Receipt A bounced.');
+        $this->reversalService->reverseReceipt(
+            $this->tenant->id,
+            $receiptA->id,
+            'Receipt A bounced.',
+            $this->authorizedStaff
+        );
 
         // 1. Assert the original Invoice is 1000% untouched
         $invoice->refresh();
@@ -178,10 +232,17 @@ class ReversalAdjustmentTest extends TestCase
         $this->assertCount(1, $reversals);
         $this->assertEquals('1000.0000', (string)$reversals->first()->amount);
 
+        // Verify Net Allocation calculations (authoritative economic reversal semantics)
+        $allocA = PaymentAllocation::where('payment_receipt_id', $receiptA->id)->first();
+        $this->assertNotNull($allocA);
+        $this->assertEquals('0.0000', (string)$allocA->net_amount);
+        $this->assertTrue($allocA->isReversed());
+
         // 4. Assert Receipt B's allocation (BDT 200) remains untouched and not reversed
-        $allocB = PaymentAllocation::where('metadata->payment_receipt_id', $receiptB->id)->first();
+        $allocB = PaymentAllocation::where('payment_receipt_id', $receiptB->id)->first();
         $this->assertNotNull($allocB);
-        $this->assertFalse(PaymentAllocationReversal::where('payment_allocation_id', $allocB->id)->exists());
+        $this->assertEquals('200.0000', (string)$allocB->net_amount);
+        $this->assertFalse($allocB->isReversed());
 
         // 5. Assert a new compensating Debit Adjustment Invoice is issued for BDT 1000 representing the chargeback
         $chargebacks = Invoice::where('customer_id', $this->customer->id)
@@ -189,6 +250,7 @@ class ReversalAdjustmentTest extends TestCase
             ->get();
         $this->assertCount(1, $chargebacks);
         $this->assertEquals(InvoiceStatus::ISSUED, $chargebacks->first()->status);
+        $this->assertEquals(InvoiceType::MANUAL_ADJUSTMENT, $chargebacks->first()->invoice_type);
         $this->assertEquals('1000.0000', (string)$chargebacks->first()->amount_due);
 
         // 6. Assert wallet balance is correctly adjusted (Initial BDT 300 - Receipt A BDT 1000 debit + Allocation credit BDT 1000 = BDT 300)
@@ -208,12 +270,12 @@ class ReversalAdjustmentTest extends TestCase
             'payment_method' => PaymentMethod::CASH,
         ]);
 
-        $this->reversalService->reverseReceipt($this->tenant->id, $receipt->id, 'Incorrect entry.');
+        $this->reversalService->reverseReceipt($this->tenant->id, $receipt->id, 'Incorrect entry.', $this->authorizedStaff);
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('This payment receipt has already been reversed.');
 
-        $this->reversalService->reverseReceipt($this->tenant->id, $receipt->id, 'Incorrect entry second attempt.');
+        $this->reversalService->reverseReceipt($this->tenant->id, $receipt->id, 'Incorrect entry second attempt.', $this->authorizedStaff);
     }
 
     /**
@@ -228,7 +290,8 @@ class ReversalAdjustmentTest extends TestCase
             TransactionType::CREDIT_ADJUSTMENT->value,
             '300.0000',
             'BDT',
-            'Compensation credit'
+            'Compensation credit',
+            $this->authorizedStaff
         );
         $this->assertNotNull($creditAdj);
         $this->assertEquals(TransactionType::CREDIT_ADJUSTMENT->value, $creditAdj->reversal_type);
@@ -242,7 +305,8 @@ class ReversalAdjustmentTest extends TestCase
             TransactionType::WAIVER->value,
             '200.0000',
             'BDT',
-            'Campaign discount waiver'
+            'Campaign discount waiver',
+            $this->authorizedStaff
         );
         $this->assertNotNull($waiver);
         $this->wallet->refresh();
@@ -255,7 +319,8 @@ class ReversalAdjustmentTest extends TestCase
             TransactionType::DEBIT_ADJUSTMENT->value,
             '100.0000',
             'BDT',
-            'Charge correction'
+            'Charge correction',
+            $this->authorizedStaff
         );
         $this->assertNotNull($debitAdj);
         $this->wallet->refresh();
@@ -268,11 +333,94 @@ class ReversalAdjustmentTest extends TestCase
             TransactionType::PENALTY->value,
             '50.0000',
             'BDT',
-            'Late fee penalty'
+            'Late fee penalty',
+            $this->authorizedStaff
         );
         $this->assertNotNull($penalty);
         $this->wallet->refresh();
         $this->assertEquals('350.0000', (string)$this->wallet->current_balance);
+    }
+
+    /**
+     * Test idempotency on manual financial adjustments.
+     */
+    public function test_manual_adjustment_idempotency(): void
+    {
+        $idempotencyKey = 'manual-adj-12345';
+
+        // 1. First request
+        $adj1 = $this->reversalService->adjustBalance(
+            $this->tenant->id,
+            $this->customer->id,
+            TransactionType::CREDIT_ADJUSTMENT->value,
+            '200.0000',
+            'BDT',
+            'Late charge refund',
+            $this->authorizedStaff,
+            ['idempotency_key' => $idempotencyKey]
+        );
+
+        $this->wallet->refresh();
+        $this->assertEquals('200.0000', (string)$this->wallet->current_balance);
+
+        // 2. Second concurrent request (same key)
+        $adj2 = $this->reversalService->adjustBalance(
+            $this->tenant->id,
+            $this->customer->id,
+            TransactionType::CREDIT_ADJUSTMENT->value,
+            '200.0000',
+            'BDT',
+            'Late charge refund',
+            $this->authorizedStaff,
+            ['idempotency_key' => $idempotencyKey]
+        );
+
+        // Balance must remain BDT 200 (not credit twice!)
+        $this->wallet->refresh();
+        $this->assertEquals('200.0000', (string)$this->wallet->current_balance);
+        $this->assertEquals($adj1->id, $adj2->id);
+    }
+
+    /**
+     * Test strict RBAC enforcement checks on non-permitted roles.
+     */
+    public function test_rbac_enforcement_throws_authorization_exception(): void
+    {
+        $receipt = $this->receiptService->createReceipt($this->tenant->id, [
+            'customer_id' => $this->customer->id,
+            'amount' => '500.0000',
+            'currency' => 'BDT',
+            'payment_method' => PaymentMethod::CASH,
+        ]);
+
+        // 1. Reversal RBAC Check
+        try {
+            $this->reversalService->reverseReceipt(
+                $this->tenant->id,
+                $receipt->id,
+                'Unauthorized try.',
+                $this->unauthorizedStaff
+            );
+            $this->fail('Guest staff successfully reversed receipt without permission.');
+        } catch (AuthorizationException $e) {
+            $this->assertStringContainsString('billing.receipt.reverse', $e->getMessage());
+        }
+
+        // 2. Adjustment RBAC Check
+        try {
+            $this->reversalService->adjustBalance(
+                $this->tenant->id,
+                $this->customer->id,
+                TransactionType::CREDIT_ADJUSTMENT->value,
+                '100.0000',
+                'BDT',
+                'Try adjust',
+                $this->unauthorizedStaff
+            );
+            $this->fail('Guest staff successfully created balance adjustment.');
+        } catch (AuthorizationException $e) {
+            $this->assertStringContainsString('billing.adjustment.manage', $e->getMessage());
+        }
     }
 
     /**
@@ -288,7 +436,7 @@ class ReversalAdjustmentTest extends TestCase
             'auto_allocate' => false,
         ]);
 
-        $reversal = $this->reversalService->reverseReceipt($this->tenant->id, $receipt->id, 'Incorrect intake.');
+        $reversal = $this->reversalService->reverseReceipt($this->tenant->id, $receipt->id, 'Incorrect intake.', $this->authorizedStaff);
 
         // Attempting to update must throw RuntimeException
         try {
@@ -330,6 +478,6 @@ class ReversalAdjustmentTest extends TestCase
         // Attempting to reverse our receipt under the context of other tenant must fail
         $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
 
-        $this->reversalService->reverseReceipt($otherTenant->id, $receipt->id, 'Fraudulent intent.');
+        $this->reversalService->reverseReceipt($otherTenant->id, $receipt->id, 'Fraudulent intent.', $this->authorizedStaff);
     }
 }

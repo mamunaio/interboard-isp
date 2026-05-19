@@ -149,9 +149,7 @@ class PaymentReceiptService
                         $amountStr,
                         [
                             'notes' => "Automatic allocation for receipt {$receipt->receipt_number}.",
-                            'metadata' => [
-                                'payment_receipt_id' => $receipt->id,
-                            ],
+                            'payment_receipt_id' => $receipt->id,
                             'created_by_type' => $data['created_by_type'] ?? null,
                             'created_by_id' => $data['created_by_id'] ?? null,
                         ]

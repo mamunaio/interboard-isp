@@ -12,7 +12,15 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        // 1. Immutable Receipt and Adjustment Audit Trail
+        // 1. Alter payment_allocations to add explicit relational linkage to payment_receipts
+        Schema::table('payment_allocations', function (Blueprint $table) {
+            $table->foreignId('payment_receipt_id')
+                ->nullable()
+                ->constrained('payment_receipts')
+                ->onDelete('restrict');
+        });
+
+        // 2. Immutable Receipt and Adjustment Audit Trail
         Schema::create('reversal_events', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->onDelete('restrict');
@@ -23,14 +31,16 @@ return new class extends Migration {
             $table->string('currency', 3)->default('BDT');
             $table->text('reason');
             $table->foreignId('reversal_ledger_entry_id')->constrained('ledger_entries')->onDelete('restrict');
+            $table->string('idempotency_key', 100)->nullable();
             $table->string('created_by_type')->nullable();
             $table->unsignedBigInteger('created_by_id')->nullable();
             $table->timestamp('created_at')->useCurrent();
 
             $table->index(['tenant_id', 'original_entity_type', 'original_entity_id'], 'reversal_entity_index');
+            $table->unique(['tenant_id', 'idempotency_key'], 'reversal_idempotency_unique');
         });
 
-        // 2. Immutable Payment Allocation Reversals Table
+        // 3. Immutable Payment Allocation Reversals Table
         Schema::create('payment_allocation_reversals', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->onDelete('restrict');
@@ -50,5 +60,10 @@ return new class extends Migration {
     {
         Schema::dropIfExists('payment_allocation_reversals');
         Schema::dropIfExists('reversal_events');
+
+        Schema::table('payment_allocations', function (Blueprint $table) {
+            $table->dropForeign(['payment_receipt_id']);
+            $table->dropColumn('payment_receipt_id');
+        });
     }
 };
