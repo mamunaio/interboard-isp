@@ -53,11 +53,11 @@ class GatewayOrchestrationService
             throw ValidationException::withMessages(['amount' => ['Requested amount must be positive.']]);
         }
 
-        return DB::transaction(function () use ($tenantId, $customerId, $gatewayEnum, $amountStr, $currency) {
-            $reference = 'ATT-' . strtoupper(bin2hex(random_bytes(8)));
+        $reference = 'ATT-' . strtoupper(bin2hex(random_bytes(8)));
 
-            // State Machine Transition 1: Create attempt in INITIATED state
-            $attempt = GatewayPaymentAttempt::create([
+        // Phase 1: Create attempt in INITIATED state and commit immediately to release DB connection/locks
+        $attempt = DB::transaction(function () use ($tenantId, $customerId, $gatewayEnum, $amountStr, $currency, $reference) {
+            return GatewayPaymentAttempt::create([
                 'tenant_id' => $tenantId,
                 'customer_id' => $customerId,
                 'gateway' => $gatewayEnum->value,
@@ -66,19 +66,26 @@ class GatewayOrchestrationService
                 'currency' => $currency,
                 'status' => GatewayPaymentStatus::INITIATED->value,
             ]);
-
-            $driver = $this->resolveDriver($gatewayEnum);
-            $initData = $driver->initiate($attempt);
-
-            // State Machine Transition 2: Transition to PENDING
-            $attempt->status = GatewayPaymentStatus::PENDING->value;
-            $attempt->save();
-
-            return [
-                'attempt' => $attempt,
-                'redirect_url' => $initData['redirect_url'] ?? null,
-            ];
         });
+
+        // Phase 2: Perform outbound gateway network API call OUTSIDE of open database transactions
+        $driver = $this->resolveDriver($gatewayEnum);
+        try {
+            $initData = $driver->initiate($attempt);
+        } catch (\Throwable $e) {
+            $attempt->status = GatewayPaymentStatus::FAILED->value;
+            $attempt->save();
+            throw $e;
+        }
+
+        // Phase 3: Transition status to PENDING and persist
+        $attempt->status = GatewayPaymentStatus::PENDING->value;
+        $attempt->save();
+
+        return [
+            'attempt' => $attempt,
+            'redirect_url' => $initData['redirect_url'] ?? null,
+        ];
     }
 
     /**
@@ -91,21 +98,21 @@ class GatewayOrchestrationService
     ): GatewayPaymentAttempt {
         $gatewayEnum = PaymentGateway::tryFrom($gateway);
         if (!$gatewayEnum) {
-            throw new RuntimeException("Unsupported payment gateway for verification: {$gateway}");
+            throw new RuntimeException("Payment verification failed.");
         }
 
         $driver = $this->resolveDriver($gatewayEnum);
 
         // 1. Webhook cryptographic signature check
         if (!$driver->validateSignature($payload, $headers)) {
-            throw new RuntimeException("Invalid cryptographic signature received from gateway: {$gateway}");
+            throw new RuntimeException("Payment verification failed.");
         }
 
         $attemptRef = $payload['attempt_reference'] ?? '';
         $gatewayTxId = $payload['gateway_transaction_id'] ?? '';
 
         if (empty($attemptRef) || empty($gatewayTxId)) {
-            throw new RuntimeException("Invalid callback payload. Missing reference keys.");
+            throw new RuntimeException("Payment verification failed.");
         }
 
         return DB::transaction(function () use ($gatewayEnum, $driver, $attemptRef, $gatewayTxId, $payload) {
@@ -113,7 +120,12 @@ class GatewayOrchestrationService
             $attempt = GatewayPaymentAttempt::withoutGlobalScopes()
                 ->where('attempt_reference', $attemptRef)
                 ->lockForUpdate()
-                ->firstOrFail();
+                ->first();
+
+            // Normalized Callback Exception: Avoids attempt reference enumeration oracle vulnerability
+            if (!$attempt) {
+                throw new RuntimeException("Payment verification failed.");
+            }
 
             // Infer correct tenant internally from the database record
             $tenantId = $attempt->tenant_id;

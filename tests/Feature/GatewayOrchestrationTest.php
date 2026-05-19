@@ -265,7 +265,7 @@ class GatewayOrchestrationTest extends TestCase
         ];
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage("Invalid cryptographic signature");
+        $this->expectExceptionMessage("Payment verification failed.");
 
         $this->orchestrationService->verifyPayment(PaymentGateway::BKASH->value, $payload);
     }
