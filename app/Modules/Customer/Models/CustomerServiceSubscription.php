@@ -8,6 +8,8 @@ use App\Core\Tenant\Traits\BelongsToTenant;
 use App\Core\Audit\Traits\LogsActivity;
 use App\Modules\Customer\Enums\SubscriptionStatus;
 use App\Modules\Customer\Enums\ServiceType;
+use App\Modules\Billing\Enums\BillingMode;
+use App\Modules\Billing\Enums\BillingCycleType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -22,9 +24,14 @@ class CustomerServiceSubscription extends Model
         'tenant_id',
         'customer_id',
         'service_package_id',
+        'service_plan_id',
         'subscription_code',
         'service_type_snapshot',
         'status',
+        'billing_mode',
+        'billing_cycle_type',
+        'next_billing_date',
+        'last_billed_at',
         'activated_at',
         'suspended_at',
         'disconnected_at',
@@ -35,6 +42,10 @@ class CustomerServiceSubscription extends Model
     protected $casts = [
         'status' => SubscriptionStatus::class,
         'service_type_snapshot' => ServiceType::class,
+        'billing_mode' => BillingMode::class,
+        'billing_cycle_type' => BillingCycleType::class,
+        'next_billing_date' => 'date',
+        'last_billed_at' => 'datetime',
         'activated_at' => 'datetime',
         'suspended_at' => 'datetime',
         'disconnected_at' => 'datetime',
@@ -55,6 +66,14 @@ class CustomerServiceSubscription extends Model
     public function servicePackage(): BelongsTo
     {
         return $this->belongsTo(ServicePackage::class);
+    }
+
+    /**
+     * Get the service plan for the subscription.
+     */
+    public function servicePlan(): BelongsTo
+    {
+        return $this->belongsTo(ServicePlan::class, 'service_plan_id');
     }
 
     /**

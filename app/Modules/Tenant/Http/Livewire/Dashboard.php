@@ -4,14 +4,28 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenant\Http\Livewire;
 
-use App\Modules\Tenant\Models\AuditLog;
+use App\Modules\Customer\Models\Customer;
+use App\Modules\Customer\Enums\CustomerStatus;
+use App\Modules\Customer\Models\CustomerServiceSubscription;
+use App\Modules\Customer\Enums\SubscriptionStatus;
+use App\Modules\Billing\Models\Invoice;
+use App\Modules\Billing\Enums\InvoiceStatus;
+use App\Modules\Billing\Models\Wallet;
+use App\Modules\Billing\Models\PaymentReceipt;
+use App\Modules\Billing\Models\SuspensionEvent;
+use App\Modules\Billing\Models\ReversalEvent;
+use App\Modules\Billing\Models\GatewayPaymentAttempt;
+use App\Modules\Billing\Enums\GatewayPaymentStatus;
 use Livewire\Component;
 
 class Dashboard extends Component
 {
     public array $stats = [];
-    public array $recentLogs = [];
-    public string $trafficSpeed = '45.8';
+    public array $recentReceipts = [];
+    public array $recentSuspensions = [];
+    public array $recentReversals = [];
+    public array $gatewaySummary = [];
+    public array $notifications = [];
 
     /**
      * Get the listeners for real-time Reverb broadcasts.
@@ -19,74 +33,130 @@ class Dashboard extends Component
     public function getListeners(): array
     {
         return [
-            "echo-private:tenant.dashboard,BandwidthUpdated" => 'refreshTraffic',
+            "echo-private:tenant.dashboard,PaymentReceived" => 'onPaymentReceived',
+            "echo-private:tenant.dashboard,SuspensionTriggered" => 'onSuspensionTriggered',
+            "echo-private:tenant.dashboard,ReversalCompleted" => 'onReversalCompleted',
+            "echo-private:tenant.dashboard,GatewayStatusUpdated" => 'onGatewayStatusUpdated',
         ];
     }
 
-    /**
-     * Mount and gather initial data.
-     */
     public function mount(): void
     {
         $this->refreshStats();
-        $this->refreshLogs();
     }
 
-    /**
-     * Refresh system status stats.
-     */
     public function refreshStats(): void
     {
-        $activeSubscribersCount = \App\Modules\Customer\Models\Customer::where('status', \App\Modules\Customer\Enums\CustomerStatus::ACTIVE->value)->count();
-        $suspendedCount = \App\Modules\Customer\Models\Customer::where('status', \App\Modules\Customer\Enums\CustomerStatus::SUSPENDED->value)->count();
+        // 1. Total active customers
+        $activeCustomers = Customer::where('status', CustomerStatus::ACTIVE->value)->count();
 
-        // Real-time Billing telemetry
-        $totalCollected = \App\Modules\Billing\Models\PaymentReceipt::sum('amount');
-        $totalCollectedFormatted = number_format((float)$totalCollected, 2);
+        // 2. Total active subscriptions
+        $activeSubscriptions = CustomerServiceSubscription::where('status', SubscriptionStatus::ACTIVE->value)->count();
 
-        $pendingGatewayCount = \App\Modules\Billing\Models\GatewayPaymentAttempt::where('status', \App\Modules\Billing\Enums\GatewayPaymentStatus::PENDING->value)->count();
-
-        $unpaidInvoicesCount = \App\Modules\Billing\Models\Invoice::whereIn('status', [
-            \App\Modules\Billing\Enums\InvoiceStatus::ISSUED->value,
-            \App\Modules\Billing\Enums\InvoiceStatus::PARTIALLY_PAID->value,
+        // 3. Unpaid invoices count
+        $unpaidInvoices = Invoice::whereIn('status', [
+            InvoiceStatus::ISSUED->value,
+            InvoiceStatus::PARTIALLY_PAID->value,
         ])->count();
 
-        $this->stats = [
-            'active_customers' => $activeSubscribersCount > 0 ? $activeSubscribersCount : 1420,
-            'suspended_customers' => $suspendedCount > 0 ? $suspendedCount : 12,
-            'gpon_onu_online' => 842,
-            'gpon_onu_offline' => 5,
-            
-            // Premium Billing Metrics
-            'total_collected' => $totalCollectedFormatted !== '0.00' ? $totalCollectedFormatted : '4,400.00',
-            'pending_gateway' => $pendingGatewayCount > 0 ? $pendingGatewayCount : 1,
-            'unpaid_invoices' => $unpaidInvoicesCount > 0 ? $unpaidInvoicesCount : 2,
-        ];
-    }
+        // 4. Overdue invoices count
+        $overdueInvoices = Invoice::whereIn('status', [
+            InvoiceStatus::ISSUED->value,
+            InvoiceStatus::PARTIALLY_PAID->value,
+        ])->where('due_date', '<', now()->toDateString())->count();
 
-    /**
-     * Fetch recent activity audit logs.
-     */
-    public function refreshLogs(): void
-    {
-        $this->recentLogs = AuditLog::orderBy('created_at', 'desc')
+        // 5. Total wallet balances
+        $totalWalletBalance = Wallet::sum('current_balance');
+
+        $this->stats = [
+            'active_customers' => $activeCustomers,
+            'active_subscriptions' => $activeSubscriptions,
+            'unpaid_invoices' => $unpaidInvoices,
+            'overdue_invoices' => $overdueInvoices,
+            'total_wallet_balance' => number_format((float)$totalWalletBalance, 2),
+        ];
+
+        // 6. Recent payment receipts
+        $this->recentReceipts = PaymentReceipt::with('customer')
+            ->orderBy('id', 'desc')
             ->limit(5)
             ->get()
             ->toArray();
+
+        // 7. Recent suspension events
+        $this->recentSuspensions = SuspensionEvent::with(['subscription.customer', 'actor'])
+            ->orderBy('id', 'desc')
+            ->limit(5)
+            ->get()
+            ->toArray();
+
+        // 8. Recent reversal events
+        $this->recentReversals = ReversalEvent::with(['originalEntity', 'actor'])
+            ->orderBy('id', 'desc')
+            ->limit(5)
+            ->get()
+            ->toArray();
+
+        // 9. Gateway attempt status summary
+        $statuses = [
+            GatewayPaymentStatus::INITIATED->value => 0,
+            GatewayPaymentStatus::PENDING->value => 0,
+            GatewayPaymentStatus::VERIFIED->value => 0,
+            GatewayPaymentStatus::FAILED->value => 0,
+            GatewayPaymentStatus::EXPIRED->value => 0,
+        ];
+        $counts = GatewayPaymentAttempt::selectRaw('status, count(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->toArray();
+        $this->gatewaySummary = array_merge($statuses, $counts);
     }
 
-    /**
-     * Handler invoked when Reverb private channel pushes traffic update.
-     */
-    public function refreshTraffic(array $event): void
+    public function onPaymentReceived(array $event): void
     {
-        $this->trafficSpeed = $event['speed'] ?? '45.8';
-        $this->refreshLogs();
+        array_unshift($this->notifications, [
+            'type' => 'payment',
+            'message' => "Payment received: BDT {$event['amount']} for {$event['customerName']} (Receipt: {$event['receiptNumber']})",
+            'time' => $event['timestamp'],
+        ]);
+        $this->refreshStats();
     }
 
-    /**
-     * Render the Livewire blade layout.
-     */
+    public function onSuspensionTriggered(array $event): void
+    {
+        array_unshift($this->notifications, [
+            'type' => 'suspension',
+            'message' => "Subscription suspended: {$event['subscriptionCode']} for {$event['customerName']} (Reason: {$event['reason']})",
+            'time' => $event['timestamp'],
+        ]);
+        $this->refreshStats();
+    }
+
+    public function onReversalCompleted(array $event): void
+    {
+        array_unshift($this->notifications, [
+            'type' => 'reversal',
+            'message' => "Payment reversed: Receipt {$event['receiptNumber']} of BDT {$event['amount']} for {$event['customerName']}",
+            'time' => $event['timestamp'],
+        ]);
+        $this->refreshStats();
+    }
+
+    public function onGatewayStatusUpdated(array $event): void
+    {
+        array_unshift($this->notifications, [
+            'type' => 'gateway',
+            'message' => "Gateway attempt {$event['attemptReference']} ({$event['gateway']}) status updated to: {$event['status']} (Amount: {$event['amount']})",
+            'time' => $event['timestamp'],
+        ]);
+        $this->refreshStats();
+    }
+
+    public function clearNotifications(): void
+    {
+        $this->notifications = [];
+    }
+
     public function render()
     {
         return view('tenant::livewire.dashboard');

@@ -14,6 +14,31 @@ class GatewayPaymentAttempt extends Model
 {
     use BelongsToTenant, LogsActivity;
 
+    protected static function booted(): void
+    {
+        static::updated(function (self $model) {
+            if ($model->wasChanged('status')) {
+                event(new \App\Modules\Tenant\Events\GatewayStatusUpdated(
+                    $model->attempt_reference,
+                    $model->gateway,
+                    (string)$model->requested_amount,
+                    $model->status,
+                    now()->toDateTimeString()
+                ));
+            }
+        });
+
+        static::created(function (self $model) {
+            event(new \App\Modules\Tenant\Events\GatewayStatusUpdated(
+                $model->attempt_reference,
+                $model->gateway,
+                (string)$model->requested_amount,
+                $model->status,
+                now()->toDateTimeString()
+            ));
+        });
+    }
+
     protected $table = 'gateway_payment_attempts';
 
     protected $fillable = [

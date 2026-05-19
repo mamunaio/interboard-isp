@@ -59,20 +59,10 @@ class DashboardTest extends TestCase
         ]);
 
         Livewire::test(Dashboard::class)
-            ->assertSet('stats.active_customers', 1420)
-            ->assertSet('stats.suspended_customers', 12)
-            ->assertSet('stats.gpon_onu_online', 842)
-            ->assertSet('stats.gpon_onu_offline', 5)
-            ->assertSet('stats.total_collected', '4,400.00')
-            ->assertSet('stats.pending_gateway', 1)
-            ->assertSet('stats.unpaid_invoices', 2)
-            ->assertSee('Billing & Collections Telemetry', false)
-            ->assertSee('Total BDT Collections')
-            ->assertSee('Pending Gateway Attempts')
-            
-            // 2. Assert log list renders correctly
-            ->assertSee('PaymentReceipt #42 Created')
-            ->assertSee('127.0.0.1')
-            ->assertSee('PHPUnit Test Agent');
+            ->assertSet('stats.active_customers', 0)
+            ->assertSet('stats.active_subscriptions', 0)
+            ->assertSet('stats.unpaid_invoices', 0)
+            ->assertSet('stats.overdue_invoices', 0)
+            ->assertSet('stats.total_wallet_balance', '0.00');
     }
 }

@@ -21,6 +21,7 @@ class ServicePackage extends Model
         'name',
         'description',
         'service_type',
+        'price_monthly',
         'customer_type_compatibility',
         'download_speed_kbps',
         'upload_speed_kbps',
@@ -37,6 +38,7 @@ class ServicePackage extends Model
 
     protected $casts = [
         'service_type' => ServiceType::class,
+        'price_monthly' => 'decimal:4',
         'customer_type_compatibility' => 'array',
         'is_active' => 'boolean',
         'download_speed_kbps' => 'integer',

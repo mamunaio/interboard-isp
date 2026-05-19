@@ -58,6 +58,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(TaxRule::class, TaxRulePolicy::class);
         Gate::policy(Wallet::class, WalletPolicy::class);
         Gate::policy(PaymentAllocation::class, PaymentAllocationPolicy::class);
+
+        \Illuminate\Database\Eloquent\Relations\Relation::morphMap([
+            'StaffUser' => \App\Modules\Auth\Models\StaffUser::class,
+        ]);
     }
 }
 

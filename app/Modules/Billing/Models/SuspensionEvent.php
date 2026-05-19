@@ -68,4 +68,9 @@ class SuspensionEvent extends Model
     {
         return $this->belongsTo(Invoice::class, 'reconnection_invoice_id');
     }
+
+    public function actor(): \Illuminate\Database\Eloquent\Relations\MorphTo
+    {
+        return $this->morphTo(__FUNCTION__, 'created_by_type', 'created_by_id');
+    }
 }

@@ -57,4 +57,14 @@ class ReversalEvent extends Model
     {
         return $this->belongsTo(LedgerEntry::class, 'reversal_ledger_entry_id');
     }
+
+    public function actor(): \Illuminate\Database\Eloquent\Relations\MorphTo
+    {
+        return $this->morphTo(__FUNCTION__, 'created_by_type', 'created_by_id');
+    }
+
+    public function originalEntity(): \Illuminate\Database\Eloquent\Relations\MorphTo
+    {
+        return $this->morphTo(__FUNCTION__, 'original_entity_type', 'original_entity_id');
+    }
 }

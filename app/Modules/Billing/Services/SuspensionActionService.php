@@ -12,6 +12,10 @@ use App\Modules\Billing\Enums\InvoiceType;
 use App\Modules\Billing\Services\InvoiceService;
 use App\Modules\Customer\Models\CustomerServiceSubscription;
 use App\Modules\Customer\Enums\SubscriptionStatus;
+use App\Modules\Provisioning\Models\ServiceProvisioningEvent;
+use App\Modules\Provisioning\Enums\ProvisioningActionType;
+use App\Modules\Provisioning\Enums\ProvisioningStatus;
+use App\Modules\Provisioning\Jobs\ProcessProvisioningJob;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
@@ -84,8 +88,31 @@ class SuspensionActionService
             $subscription->status = SubscriptionStatus::SUSPENDED;
             $subscription->save();
 
+            // 5. Dispatch Provisioning Event to disconnect the user
+            $provisioningEvent = ServiceProvisioningEvent::create([
+                'tenant_id' => $tenantId,
+                'customer_id' => $subscription->customer_id,
+                'subscription_id' => $subscription->id,
+                'action_type' => ProvisioningActionType::SUSPEND,
+                'status' => ProvisioningStatus::PENDING,
+                'provider' => 'mikrotik',
+                'request_payload_json' => ['username' => $subscription->subscription_code],
+            ]);
+
+            ProcessProvisioningJob::dispatch($provisioningEvent->id);
+
             return $subscription;
         });
+
+        $subscription->load('customer');
+        event(new \App\Modules\Tenant\Events\SuspensionTriggered(
+            $subscription->subscription_code,
+            $subscription->customer->full_name,
+            $options['reason'] ?? 'Automatic suspension due to overdue outstanding dues.',
+            now()->toDateTimeString()
+        ));
+
+        return $subscription;
     }
 
     /**
@@ -216,6 +243,19 @@ class SuspensionActionService
             // 5. Transition subscription -> active
             $subscription->status = SubscriptionStatus::ACTIVE;
             $subscription->save();
+
+            // 6. Dispatch Provisioning Event to reconnect the user
+            $provisioningEvent = ServiceProvisioningEvent::create([
+                'tenant_id' => $tenantId,
+                'customer_id' => $subscription->customer_id,
+                'subscription_id' => $subscription->id,
+                'action_type' => ProvisioningActionType::REACTIVATE,
+                'status' => ProvisioningStatus::PENDING,
+                'provider' => 'mikrotik',
+                'request_payload_json' => ['username' => $subscription->subscription_code],
+            ]);
+
+            ProcessProvisioningJob::dispatch($provisioningEvent->id);
 
             return $subscription;
         });

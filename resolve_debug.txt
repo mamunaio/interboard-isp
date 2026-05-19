@@ -1,5 +1,17 @@
-HOST: interboard.net
-CENTRAL: interboard.net
-ENDS_WITH: NO
-SUBDOMAIN: interboard.net
-TENANT_FOUND: NO
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES
+Registering: tenant::dashboard | Class: App\Modules\Tenant\Http\Livewire\Dashboard | Exists: YES

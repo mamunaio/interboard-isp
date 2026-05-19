@@ -159,6 +159,16 @@ class PaymentReceiptService
 
             return $receipt;
         });
+
+        $receipt->load('customer');
+        event(new \App\Modules\Tenant\Events\PaymentReceived(
+            $receipt->receipt_number,
+            (string)$receipt->amount,
+            $receipt->customer->full_name,
+            now()->toDateTimeString()
+        ));
+
+        return $receipt;
     }
 
     /**

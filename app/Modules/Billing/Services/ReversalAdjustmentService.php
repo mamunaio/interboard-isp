@@ -152,7 +152,6 @@ class ReversalAdjustmentService
                 ]
             );
 
-            // 7. Write Immutable ReversalEvent Audit entry
             return ReversalEvent::create([
                 'tenant_id' => $tenantId,
                 'original_entity_type' => PaymentReceipt::class,
@@ -167,6 +166,17 @@ class ReversalAdjustmentService
                 'created_by_id' => $actor->id,
             ]);
         });
+
+        $receipt = PaymentReceipt::withoutGlobalScopes()->with('customer')->find($receiptId);
+        event(new \App\Modules\Tenant\Events\ReversalCompleted(
+            $receipt->receipt_number,
+            (string)$reversalEvent->amount,
+            $receipt->customer->full_name,
+            $reversalEvent->reason,
+            now()->toDateTimeString()
+        ));
+
+        return $reversalEvent;
     }
 
     /**

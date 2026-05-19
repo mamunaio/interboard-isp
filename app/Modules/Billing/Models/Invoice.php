@@ -35,6 +35,8 @@ class Invoice extends Model
         'grand_total',
         'amount_paid',
         'amount_due',
+        'billing_period_start',
+        'billing_period_end',
         'status',
         'notes',
         'metadata',
@@ -45,6 +47,8 @@ class Invoice extends Model
         'invoice_type' => InvoiceType::class,
         'issue_date' => 'date',
         'due_date' => 'date',
+        'billing_period_start' => 'date',
+        'billing_period_end' => 'date',
         'subtotal' => 'decimal:4',
         'tax_total' => 'decimal:4',
         'discount_total' => 'decimal:4',
@@ -76,5 +80,13 @@ class Invoice extends Model
     public function lineItems(): HasMany
     {
         return $this->hasMany(InvoiceLineItem::class);
+    }
+
+    /**
+     * Get the payment allocations applied to this invoice.
+     */
+    public function allocations(): HasMany
+    {
+        return $this->hasMany(PaymentAllocation::class, 'invoice_id');
     }
 }
