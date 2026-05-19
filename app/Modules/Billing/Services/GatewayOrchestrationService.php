@@ -130,7 +130,11 @@ class GatewayOrchestrationService
             // Infer correct tenant internally from the database record
             $tenantId = $attempt->tenant_id;
 
-            // 3. Strict Idempotency Check Matrix
+            // 3. Strict Idempotency Check Matrix & State Transition Guard
+            if ($attempt->status === GatewayPaymentStatus::FAILED->value) {
+                throw new RuntimeException("Payment verification failed.");
+            }
+
             if ($attempt->status === GatewayPaymentStatus::VERIFIED->value) {
                 if ($attempt->gateway_transaction_id === $gatewayTxId) {
                     // SAME attempt + SAME tx ID = Idempotent success (avoid double ledger posting)

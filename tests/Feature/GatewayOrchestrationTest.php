@@ -322,4 +322,32 @@ class GatewayOrchestrationTest extends TestCase
         $this->assertNotNull($receipt);
         $this->assertEquals($otherCustomer->id, $receipt->customer_id);
     }
+
+    /**
+     * Test that FAILED is a terminal state and cannot transition to VERIFIED.
+     */
+    public function test_failed_attempt_is_terminal_and_cannot_be_verified(): void
+    {
+        $initiation = $this->orchestrationService->initiatePayment(
+            $this->tenant->id,
+            $this->customer->id,
+            PaymentGateway::BKASH->value,
+            '250.0000'
+        );
+        $attempt = $initiation['attempt'];
+
+        // Force transition to FAILED status
+        $attempt->status = GatewayPaymentStatus::FAILED->value;
+        $attempt->save();
+
+        $payload = [
+            'attempt_reference' => $attempt->attempt_reference,
+            'gateway_transaction_id' => 'TXN-FAIL-TERMINAL',
+        ];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("Payment verification failed.");
+
+        $this->orchestrationService->verifyPayment(PaymentGateway::BKASH->value, $payload);
+    }
 }
