@@ -1,0 +1,5 @@
+HOST: interboard.net
+CENTRAL: interboard.net
+ENDS_WITH: NO
+SUBDOMAIN: interboard.net
+TENANT_FOUND: NO
