@@ -8,8 +8,8 @@ use App\Core\Notification\Adapters\EmailAdapter;
 use App\Core\Notification\Adapters\SmsAdapter;
 use App\Core\Notification\Adapters\WhatsappAdapter;
 use App\Core\Tenant\TenantManager;
-use App\Modules\Customer\Models\NotificationLog;
-use App\Modules\Customer\Models\NotificationTemplate;
+use App\Modules\Notification\Models\NotificationLog;
+use App\Modules\Notification\Models\NotificationTemplate;
 use Illuminate\Container\Container;
 
 class NotificationRouter
@@ -22,7 +22,7 @@ class NotificationRouter
     /**
      * Parse template placeholders, execute delivery via appropriate channel adapter, and log output.
      */
-    public function send(string $recipient, string $templateSlug, array $variables = [], string $channel = 'email'): bool
+    public function send(string $recipient, string $templateSlug, array $variables = [], string $channel = 'email', ?int $customerId = null): bool
     {
         $tenantId = $this->tenantManager->getTenantId();
 
@@ -30,28 +30,22 @@ class NotificationRouter
         $template = null;
         if ($tenantId) {
             $template = NotificationTemplate::where('tenant_id', $tenantId)
-                ->where('slug', $templateSlug)
+                ->where('event_name', $templateSlug)
                 ->where('channel', $channel)
+                ->where('is_active', true)
                 ->first();
         }
 
         if (!$template) {
-            $template = NotificationTemplate::whereNull('tenant_id')
-                ->where('slug', $templateSlug)
-                ->where('channel', $channel)
-                ->first();
-        }
-
-        if (!$template) {
-            throw new \Exception("Notification template [{$templateSlug}] for channel [{$channel}] not found.");
+            throw new \Exception("Notification template [{$templateSlug}] for channel [{$channel}] not found or inactive.");
         }
 
         // 2. Parse Placeholders
         $subject = $template->subject;
-        $content = $template->content;
+        $content = $template->body;
 
         foreach ($variables as $key => $val) {
-            $placeholder = '{{' . $key . '}}';
+            $placeholder = '{' . $key . '}'; // Using {customer_name} format as specified
             if ($subject !== null) {
                 $subject = str_replace($placeholder, (string)$val, $subject);
             }
@@ -60,11 +54,11 @@ class NotificationRouter
 
         // 3. Create Pending Delivery Log
         $log = NotificationLog::create([
-            'tenant_id' => $tenantId ?? 0,
+            'tenant_id' => $tenantId,
+            'customer_id' => $customerId,
             'channel' => $channel,
             'recipient' => $recipient,
-            'subject' => $subject,
-            'content' => $content,
+            'message' => $content,
             'status' => 'pending',
         ]);
 

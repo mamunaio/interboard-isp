@@ -28,6 +28,7 @@ class StaffUser extends Authenticatable
         'status',
         'last_login_at',
         'last_login_ip',
+        'is_superadmin',
     ];
 
     protected $hidden = [
@@ -41,6 +42,7 @@ class StaffUser extends Authenticatable
         'password' => 'hashed',
         'two_factor_confirmed_at' => 'datetime',
         'last_login_at' => 'datetime',
+        'is_superadmin' => 'boolean',
     ];
 
     /**

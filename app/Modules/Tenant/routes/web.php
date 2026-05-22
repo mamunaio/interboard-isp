@@ -19,6 +19,9 @@ use App\Modules\Provisioning\Http\Livewire\ProvisioningIndex;
 use App\Modules\Network\Http\Livewire\OnlineUsersIndex;
 use App\Modules\Network\Http\Livewire\NetworkSessionsIndex;
 use App\Modules\Network\Http\Livewire\RadiusConfigIndex;
+use App\Modules\Network\Http\Livewire\OltManager;
+use App\Modules\Network\Http\Livewire\OnuProvisioner;
+use App\Modules\Billing\Http\Livewire\FinancialStatementsIndex;
 
 Route::get('/dashboard', Dashboard::class)->name('tenant.dashboard');
 Route::get('/audit', \App\Modules\Tenant\Http\Livewire\AuditTimeline::class)->name('tenant.audit');
@@ -38,3 +41,6 @@ Route::get('/provisioning', ProvisioningIndex::class)->name('tenant.provisioning
 Route::get('/online-users', OnlineUsersIndex::class)->name('tenant.online-users.index');
 Route::get('/network-sessions', NetworkSessionsIndex::class)->name('tenant.network-sessions.index');
 Route::get('/radius', RadiusConfigIndex::class)->name('tenant.radius.index');
+Route::get('/olts', OltManager::class)->name('tenant.olts.index');
+Route::get('/onu-provision', OnuProvisioner::class)->name('tenant.onu.index');
+Route::get('/financial-statements', FinancialStatementsIndex::class)->name('tenant.financial-statements.index');

@@ -16,6 +16,13 @@ class ServicePlanCrud extends Component
 
     public string $search = '';
 
+    public ?int $tenantId = null;
+
+    public function mount(): void
+    {
+        $this->tenantId = app(TenantManager::class)->getTenantId();
+    }
+
     // Modal & Form States
     public bool $isCreateModalOpen = false;
     public bool $isEditModalOpen = false;
@@ -33,7 +40,7 @@ class ServicePlanCrud extends Component
 
     protected function rules(): array
     {
-        $tenantId = app(TenantManager::class)->getTenantId();
+        $tenantId = $this->tenantId;
         $codeRule = 'required|string|max:50';
 
         if ($this->editingPlanId) {
@@ -83,7 +90,7 @@ class ServicePlanCrud extends Component
     {
         $this->validate();
 
-        $tenantId = app(TenantManager::class)->getTenantId();
+        $tenantId = $this->tenantId;
 
         ServicePlan::create([
             'tenant_id' => $tenantId,
@@ -105,7 +112,7 @@ class ServicePlanCrud extends Component
     public function editPlan(int $id): void
     {
         $this->resetForm();
-        $tenantId = app(TenantManager::class)->getTenantId();
+        $tenantId = $this->tenantId;
 
         $plan = ServicePlan::where('tenant_id', $tenantId)->findOrFail($id);
 
@@ -126,7 +133,7 @@ class ServicePlanCrud extends Component
     {
         $this->validate();
 
-        $tenantId = app(TenantManager::class)->getTenantId();
+        $tenantId = $this->tenantId;
         $plan = ServicePlan::where('tenant_id', $tenantId)->findOrFail($this->editingPlanId);
 
         $plan->update([
@@ -147,7 +154,7 @@ class ServicePlanCrud extends Component
 
     public function toggleActive(int $id): void
     {
-        $tenantId = app(TenantManager::class)->getTenantId();
+        $tenantId = $this->tenantId;
         $plan = ServicePlan::where('tenant_id', $tenantId)->findOrFail($id);
         $plan->is_active = !$plan->is_active;
         $plan->save();
@@ -157,7 +164,7 @@ class ServicePlanCrud extends Component
 
     public function render()
     {
-        $tenantId = app(TenantManager::class)->getTenantId();
+        $tenantId = $this->tenantId;
 
         $plans = ServicePlan::where('tenant_id', $tenantId)
             ->when($this->search, function ($query) {

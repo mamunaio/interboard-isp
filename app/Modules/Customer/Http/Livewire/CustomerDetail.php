@@ -14,6 +14,7 @@ use App\Modules\Billing\Enums\BillingMode;
 use App\Modules\Billing\Enums\BillingCycleType;
 use App\Modules\Billing\Models\Invoice;
 use App\Modules\Billing\Services\BillingGenerationService;
+use App\Modules\Customer\Services\CustomerLifecycleService;
 use Livewire\Component;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -134,6 +135,39 @@ class CustomerDetail extends Component
             session()->flash('message', "Invoice {$invoice->invoice_number} generated successfully.");
         } catch (\Exception $e) {
             session()->flash('error', $e->getMessage());
+        }
+    }
+
+    public function suspendCustomer(): void
+    {
+        try {
+            $lifecycleService = app(CustomerLifecycleService::class);
+            $lifecycleService->suspendCustomer($this->customer, 'Manual suspension by admin');
+            session()->flash('message', 'Customer has been suspended successfully.');
+        } catch (\Exception $e) {
+            session()->flash('error', 'Failed to suspend: ' . $e->getMessage());
+        }
+    }
+
+    public function reactivateCustomer(): void
+    {
+        try {
+            $lifecycleService = app(CustomerLifecycleService::class);
+            $lifecycleService->activateCustomer($this->customer, 'Manual reactivation by admin');
+            session()->flash('message', 'Customer has been reactivated successfully.');
+        } catch (\Exception $e) {
+            session()->flash('error', 'Failed to reactivate: ' . $e->getMessage());
+        }
+    }
+
+    public function terminateCustomer(): void
+    {
+        try {
+            $lifecycleService = app(CustomerLifecycleService::class);
+            $lifecycleService->churnCustomer($this->customer, 'Manual termination by admin');
+            session()->flash('message', 'Customer has been permanently disconnected (Churned).');
+        } catch (\Exception $e) {
+            session()->flash('error', 'Failed to terminate: ' . $e->getMessage());
         }
     }
 

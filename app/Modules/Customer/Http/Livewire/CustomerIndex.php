@@ -10,6 +10,7 @@ use App\Modules\Customer\Models\CustomerAddress;
 use App\Modules\Customer\Enums\CustomerStatus;
 use App\Modules\Customer\Enums\CustomerType;
 use App\Modules\Customer\Enums\AddressType;
+use App\Modules\Support\Services\WorkOrderService;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,13 @@ class CustomerIndex extends Component
 
     public string $search = '';
     
+    public ?int $tenantId = null;
+
+    public function mount(): void
+    {
+        $this->tenantId = app(TenantManager::class)->getTenantId();
+    }
+
     // Modal & Form States
     public bool $isCreateModalOpen = false;
     public bool $isEditModalOpen = false;
@@ -38,7 +46,7 @@ class CustomerIndex extends Component
 
     protected function rules(): array
     {
-        $tenantId = app(TenantManager::class)->getTenantId();
+        $tenantId = $this->tenantId;
         
         $customerCodeRule = 'required|string|max:50';
         $phoneRule = 'required|string|max:50';
@@ -74,7 +82,7 @@ class CustomerIndex extends Component
         $this->resetForm();
         
         // Pre-generate a code if sequences or random
-        $tenantId = app(TenantManager::class)->getTenantId();
+        $tenantId = $this->tenantId;
         $count = Customer::where('tenant_id', $tenantId)->count() + 1;
         $this->customer_code = 'CUST-' . str_pad((string)$count, 5, '0', STR_PAD_LEFT);
         
@@ -105,7 +113,7 @@ class CustomerIndex extends Component
     {
         $this->validate();
 
-        $tenantId = app(TenantManager::class)->getTenantId();
+        $tenantId = $this->tenantId;
 
         DB::transaction(function () use ($tenantId) {
             $customer = Customer::create([
@@ -132,6 +140,9 @@ class CustomerIndex extends Component
                 'is_default_billing' => true,
                 'is_default_installation' => true,
             ]);
+
+            // Auto-generate Installation Work Order
+            app(WorkOrderService::class)->createInstallationOrder($customer);
         });
 
         $this->isCreateModalOpen = false;
@@ -142,7 +153,7 @@ class CustomerIndex extends Component
     public function editCustomer(int $id): void
     {
         $this->resetForm();
-        $tenantId = app(TenantManager::class)->getTenantId();
+        $tenantId = $this->tenantId;
         
         $customer = Customer::where('tenant_id', $tenantId)->findOrFail($id);
         
@@ -166,7 +177,7 @@ class CustomerIndex extends Component
     {
         $this->validate();
 
-        $tenantId = app(TenantManager::class)->getTenantId();
+        $tenantId = $this->tenantId;
 
         DB::transaction(function () use ($tenantId) {
             $customer = Customer::where('tenant_id', $tenantId)->findOrFail($this->editingCustomerId);
@@ -210,7 +221,7 @@ class CustomerIndex extends Component
 
     public function render()
     {
-        $tenantId = app(TenantManager::class)->getTenantId();
+        $tenantId = $this->tenantId;
 
         $customers = Customer::where('tenant_id', $tenantId)
             ->when($this->search, function ($query) {

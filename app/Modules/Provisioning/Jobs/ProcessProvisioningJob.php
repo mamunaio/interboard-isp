@@ -29,7 +29,7 @@ class ProcessProvisioningJob implements ShouldQueue
         public int $eventId
     ) {}
 
-    public function handle(MikroTikApiService $api, TenantManager $tenantManager): void
+    public function handle(MikroTikApiService $api, TenantManager $tenantManager, \App\Modules\Network\Services\RadiusProvisioningService $radius): void
     {
         // Skip tenant scoping to find the event
         $event = ServiceProvisioningEvent::withoutGlobalScopes()->findOrFail($this->eventId);
@@ -47,7 +47,7 @@ class ProcessProvisioningJob implements ShouldQueue
         $this->broadcastReverbEvent($event, 'started');
 
         try {
-            $response = $this->executeAction($api, $event);
+            $response = $this->executeAction($api, $radius, $event);
 
             $event->update([
                 'status' => ProvisioningStatus::COMPLETED,
@@ -70,25 +70,62 @@ class ProcessProvisioningJob implements ShouldQueue
         }
     }
 
-    protected function executeAction(MikroTikApiService $api, ServiceProvisioningEvent $event): array
-    {
+    protected function executeAction(
+        MikroTikApiService $api,
+        \App\Modules\Network\Services\RadiusProvisioningService $radius,
+        ServiceProvisioningEvent $event
+    ): array {
         $payload = $event->request_payload_json ?? [];
         $username = $payload['username'] ?? $event->subscription->subscription_code;
+        $action = $event->action_type;
 
-        return match ($event->action_type) {
-            ProvisioningActionType::PROVISION => $api->createPppSecret(
-                $username,
-                $payload['password'] ?? 'default123',
-                $payload['profile'] ?? 'default'
-            ),
-            ProvisioningActionType::SUSPEND => $api->disablePppSecret($username),
-            ProvisioningActionType::REACTIVATE => $api->enablePppSecret($username),
-            ProvisioningActionType::TERMINATE => $api->removePppSecret($username),
-            ProvisioningActionType::PROFILE_CHANGE => $api->updateProfile(
-                $username,
-                $payload['profile'] ?? 'default'
-            ),
-        };
+        $mikrotikResponse = [];
+        $radiusResponse = ['status' => 'synced'];
+
+        try {
+            // 1. Sync RADIUS database
+            $actionStr = match ($action) {
+                ProvisioningActionType::PROVISION => 'provision',
+                ProvisioningActionType::SUSPEND => 'suspend',
+                ProvisioningActionType::REACTIVATE => 'reactivate',
+                ProvisioningActionType::TERMINATE => 'terminate',
+                ProvisioningActionType::PROFILE_CHANGE => 'profile_change',
+            };
+            
+            $radius->sync($event->subscription, $actionStr, $payload);
+        } catch (Throwable $e) {
+            $radiusResponse = ['status' => 'failed', 'error' => $e->getMessage()];
+        }
+
+        try {
+            // 2. MikroTik API operations (may fail if host is not configured)
+            $mikrotikResponse = match ($action) {
+                ProvisioningActionType::PROVISION => $api->createPppSecret(
+                    $username,
+                    $payload['password'] ?? 'default123',
+                    $payload['profile'] ?? 'default'
+                ),
+                ProvisioningActionType::SUSPEND => $api->disablePppSecret($username),
+                ProvisioningActionType::REACTIVATE => $api->enablePppSecret($username),
+                ProvisioningActionType::TERMINATE => $api->removePppSecret($username),
+                ProvisioningActionType::PROFILE_CHANGE => $api->updateProfile(
+                    $username,
+                    $payload['profile'] ?? 'default'
+                ),
+            };
+        } catch (Throwable $e) {
+            $mikrotikResponse = ['status' => 'error_or_skipped', 'message' => $e->getMessage()];
+            // If MikroTik is not configured or fails, we still consider the job successful 
+            // if RADIUS sync worked, to allow running without a real RouterOS server connection.
+            if ($radiusResponse['status'] === 'failed') {
+                throw new Exception("Both RADIUS and MikroTik provisioning failed. MikroTik: " . $e->getMessage());
+            }
+        }
+
+        return [
+            'mikrotik' => $mikrotikResponse,
+            'radius' => $radiusResponse,
+        ];
     }
 
     protected function broadcastReverbEvent(ServiceProvisioningEvent $event, string $stage): void

@@ -49,6 +49,7 @@ class DatabaseSeeder extends Seeder
             [
                 'name' => 'Interboard Executive Admin',
                 'password' => bcrypt('password'),
+                'is_superadmin' => true,
             ]
         );
 
@@ -253,6 +254,34 @@ class DatabaseSeeder extends Seeder
                 ]);
             }
 
+            // Seed RADIUS check and reply rules
+            \App\Modules\Network\Models\RadCheck::create([
+                'tenant_id' => $tenant->id,
+                'subscription_id' => $sub->id,
+                'username' => $sub->subscription_code,
+                'attribute' => 'Cleartext-Password',
+                'op' => ':=',
+                'value' => 'pass_' . substr($sub->subscription_code, 4),
+            ]);
+
+            $rateLimit = '10M/10M';
+            if ($data['package']->download_speed_kbps > 0 && $data['package']->upload_speed_kbps > 0) {
+                $rateLimit = sprintf(
+                    '%dK/%dK',
+                    $data['package']->upload_speed_kbps,
+                    $data['package']->download_speed_kbps
+                );
+            }
+
+            \App\Modules\Network\Models\RadReply::create([
+                'tenant_id' => $tenant->id,
+                'subscription_id' => $sub->id,
+                'username' => $sub->subscription_code,
+                'attribute' => 'Mikrotik-Rate-Limit',
+                'op' => '=',
+                'value' => $rateLimit,
+            ]);
+
             // If Suspended, create a Suspension Event and manual adjustment
             if ($data['status'] === CustomerStatus::SUSPENDED) {
                 SuspensionEvent::create([
@@ -261,8 +290,8 @@ class DatabaseSeeder extends Seeder
                     'action_type' => 'suspended',
                     'reason' => 'Non-payment of monthly billing invoice.',
                     'triggering_metadata' => ['invoice_id' => $invoice->id],
-                    'created_by_type' => 'System',
-                    'created_by_id' => 1,
+                    'created_by_type' => null,
+                    'created_by_id' => null,
                 ]);
 
                 // Seed Permission and Role
@@ -326,6 +355,46 @@ class DatabaseSeeder extends Seeder
                 'status' => $attemptCount === 1 ? GatewayPaymentStatus::PENDING->value : GatewayPaymentStatus::VERIFIED->value,
                 'gateway_transaction_id' => $attemptCount === 1 ? null : 'TXN-' . strtoupper(bin2hex(random_bytes(4))),
                 'verified_at' => $attemptCount === 1 ? null : now(),
+            ]);
+        }
+
+        // 6. Seed OLT Devices
+        $olt1 = \App\Modules\Network\Models\OltDevice::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Core OLT Dhaka (ZTE)',
+            'ip_address' => '10.100.10.10',
+            'port' => 23,
+            'username' => 'admin',
+            'password' => 'zteolt123',
+            'vendor' => 'zte',
+            'status' => 'online',
+        ]);
+
+        $olt2 = \App\Modules\Network\Models\OltDevice::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Banani POP OLT (Huawei)',
+            'ip_address' => '10.200.20.10',
+            'port' => 23,
+            'username' => 'superadmin',
+            'password' => 'huawei456',
+            'vendor' => 'huawei',
+            'status' => 'online',
+        ]);
+
+        // 7. Seed ONU Devices
+        // Find one customer subscription to link
+        $firstSub = CustomerServiceSubscription::where('tenant_id', $tenant->id)->first();
+        if ($firstSub) {
+            \App\Modules\Network\Models\OnuDevice::create([
+                'tenant_id' => $tenant->id,
+                'subscription_id' => $firstSub->id,
+                'olt_device_id' => $olt1->id,
+                'serial_number' => 'ZTEG8B2C4D6E',
+                'gpon_port' => '0/1/1',
+                'onu_id' => 1,
+                'line_profile' => 'GPON-LINE-DEFAULT',
+                'service_profile' => 'GPON-SERV-DEFAULT',
+                'status' => 'active',
             ]);
         }
     }

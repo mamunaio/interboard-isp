@@ -95,6 +95,30 @@
                         </p>
                     </div>
                 </div>
+
+                <!-- Lifecycle Actions -->
+                <div class="mt-8 pt-6 border-t border-slate-800 flex flex-wrap gap-3">
+                    @if($customer->status->value !== 'active')
+                        <button wire:click="reactivateCustomer" class="flex-1 px-4 py-2 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-900 text-emerald-400 text-xs font-bold rounded-xl transition duration-150 flex items-center justify-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            Reactivate
+                        </button>
+                    @endif
+                    
+                    @if($customer->status->value === 'active')
+                        <button wire:click="suspendCustomer" onclick="confirm('Are you sure you want to suspend this customer? They will be disconnected from the internet.') || event.stopImmediatePropagation()" class="flex-1 px-4 py-2 bg-amber-950/60 hover:bg-amber-900 border border-amber-900 text-amber-400 text-xs font-bold rounded-xl transition duration-150 flex items-center justify-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                            Suspend
+                        </button>
+                    @endif
+
+                    @if($customer->status->value !== 'churned')
+                        <button wire:click="terminateCustomer" onclick="confirm('DANGER: Are you sure you want to permanently churn/terminate this customer?') || event.stopImmediatePropagation()" class="w-full px-4 py-2 mt-2 bg-rose-950/60 hover:bg-rose-900 border border-rose-900 text-rose-400 text-xs font-bold rounded-xl transition duration-150 flex items-center justify-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            Terminate (Churn)
+                        </button>
+                    @endif
+                </div>
             </div>
 
             <!-- Financial Snapshot Widget -->
@@ -121,6 +145,11 @@
                         <p class="text-xl font-bold text-rose-500 mt-1">{{ number_format((float)$overdueAmount, 2) }} BDT</p>
                     </div>
                 </div>
+            </div>
+
+            <!-- Lifecycle Timeline -->
+            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
+                @include('customer::livewire.components.lifecycle-timeline', ['customerId' => $customer->id])
             </div>
         </div>
 

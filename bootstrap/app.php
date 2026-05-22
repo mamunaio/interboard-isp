@@ -17,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Core\Http\Middleware\ResolveTenant::class,
             \App\Core\Http\Middleware\EnforceTenantIsolation::class,
         ]);
+
+        $middleware->alias([
+            'superadmin' => \App\Http\Middleware\SuperAdminMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
