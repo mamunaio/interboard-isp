@@ -35,7 +35,7 @@
         @php
             $tenantManager = app(\App\Core\Tenant\TenantManager::class);
             $tenant = $tenantManager->getTenant();
-            $user = auth()->user() ?? auth('staff')->user();
+            $user = auth()->user() ?? auth('staff')->user() ?? \App\Modules\Auth\Models\StaffUser::first();
             $userName = $user ? $user->name : 'System Admin';
             $userEmail = $user ? $user->email : 'admin@isp.net';
         @endphp
@@ -65,10 +65,7 @@
                         Audit Activity Log
                     </a>
 
-                    <a href="/search" class="flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition duration-200 {{ request()->is('search*') ? 'bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 border border-cyan-100 dark:border-cyan-900/50' : 'text-slate-650 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-850 hover:text-slate-900 dark:hover:text-slate-200' }}">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        Global Search
-                    </a>
+
 
                     <a href="/leads" class="flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition duration-200 {{ request()->is('leads*') ? 'bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 border border-cyan-100 dark:border-cyan-900/50' : 'text-slate-650 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-850 hover:text-slate-900 dark:hover:text-slate-200' }}">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
@@ -229,12 +226,18 @@
                             </span>
                         @endif
  
-                        <!-- Search Box Link in Topbar -->
-                        <div class="hidden md:block ml-4">
-                            <a href="/search" class="flex items-center gap-2 px-4 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-slate-350 dark:hover:border-slate-700 rounded-xl text-xs text-slate-500 dark:text-slate-400 hover:text-slate-750 dark:hover:text-slate-200 transition duration-150">
-                                <svg class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                Search...
-                            </a>
+                        <!-- Search Box Button in Topbar -->
+                        <div class="hidden md:block ml-4" x-data>
+                            <button @click="$dispatch('open-search')" class="flex items-center justify-between w-64 gap-2 px-4 py-2 bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800/80 hover:border-cyan-500/50 dark:hover:border-cyan-500/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.15)] rounded-2xl text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-all duration-300 group">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-slate-400 dark:text-slate-500 group-hover:text-cyan-500 dark:group-hover:text-cyan-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                    <span class="font-medium tracking-wide">Quick Search...</span>
+                                </div>
+                                <div class="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                                    <kbd class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-400 font-sans shadow-sm">Ctrl</kbd>
+                                    <kbd class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-400 font-sans shadow-sm">K</kbd>
+                                </div>
+                            </button>
                         </div>
                     </div>
  
@@ -287,15 +290,19 @@
                             </div>
                             <!-- User Dropdown Menu -->
                             <div class="relative" x-data="{ open: false }">
-                                <button @click="open = !open" class="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750 transition duration-200">
-                                    {{ substr($userName, 0, 1) }}
+                                <button @click="open = !open" class="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750 transition duration-200 overflow-hidden">
+                                    @if($user && $user->avatar)
+                                        <img src="{{ asset('storage/' . $user->avatar) }}" alt="{{ $userName }}" class="w-full h-full object-cover">
+                                    @else
+                                        {{ substr($userName, 0, 1) }}
+                                    @endif
                                 </button>
                                 <div x-show="open" @click.away="open = false" style="display: none;" class="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl py-2 z-50">
                                     <div class="px-4 py-2 border-b border-slate-200 dark:border-slate-800 sm:hidden">
                                         <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ $userName }}</p>
                                         <p class="text-xs text-slate-500">{{ $userEmail }}</p>
                                     </div>
-                                    <a href="#" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 hover:text-slate-900 dark:hover:text-white transition duration-150">Profile Settings</a>
+                                    <a href="/profile" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 hover:text-slate-900 dark:hover:text-white transition duration-150">Profile Settings</a>
                                     <a href="#" class="block px-4 py-2 text-sm text-rose-500 dark:text-rose-450 hover:bg-slate-100 dark:hover:bg-slate-850 hover:text-rose-600">Sign Out</a>
                                 </div>
                             </div>
@@ -309,6 +316,9 @@
                 </main>
             </div>
         </div>
+
+        <!-- Global Spotlight Search Modal -->
+        @livewire(\App\Modules\Tenant\Http\Livewire\GlobalSearch::class)
 
         @livewireScripts
     </body>

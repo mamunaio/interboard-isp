@@ -73,7 +73,7 @@ class Dashboard extends Component
             'active_subscriptions' => $activeSubscriptions,
             'unpaid_invoices' => $unpaidInvoices,
             'overdue_invoices' => $overdueInvoices,
-            'total_wallet_balance' => number_format((float)$totalWalletBalance, 2),
+            'total_wallet_balance' => $totalWalletBalance,
         ];
 
         // 6. Recent payment receipts
@@ -84,14 +84,14 @@ class Dashboard extends Component
             ->toArray();
 
         // 7. Recent suspension events
-        $this->recentSuspensions = SuspensionEvent::with(['subscription.customer', 'actor'])
+        $this->recentSuspensions = SuspensionEvent::with(['subscription.customer'])
             ->orderBy('id', 'desc')
             ->limit(5)
             ->get()
             ->toArray();
 
         // 8. Recent reversal events
-        $this->recentReversals = ReversalEvent::with(['originalEntity', 'actor'])
+        $this->recentReversals = ReversalEvent::with(['originalEntity'])
             ->orderBy('id', 'desc')
             ->limit(5)
             ->get()

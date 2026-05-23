@@ -24,6 +24,7 @@ use App\Modules\Network\Http\Livewire\OnuProvisioner;
 use App\Modules\Billing\Http\Livewire\FinancialStatementsIndex;
 
 Route::get('/dashboard', Dashboard::class)->name('tenant.dashboard');
+Route::get('/profile', \App\Modules\Tenant\Http\Livewire\ProfileSettings::class)->name('tenant.profile');
 Route::get('/audit', \App\Modules\Tenant\Http\Livewire\AuditTimeline::class)->name('tenant.audit');
 Route::get('/search', \App\Modules\Tenant\Http\Livewire\GlobalSearch::class)->name('tenant.search');
 Route::get('/customers', CustomerIndex::class)->name('tenant.customers.index');

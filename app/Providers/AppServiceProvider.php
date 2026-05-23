@@ -62,6 +62,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Database\Eloquent\Relations\Relation::morphMap([
             'StaffUser' => \App\Modules\Auth\Models\StaffUser::class,
         ]);
+
+        \Livewire\Livewire::setUpdateRoute(function ($handle) {
+            return \Illuminate\Support\Facades\Route::post('/livewire/update', $handle)
+                ->middleware(['web', 'tenant']);
+        });
     }
 }
 
