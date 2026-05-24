@@ -49,7 +49,7 @@
                         <span class="p-1.5 bg-gradient-to-tr from-cyan-500 to-indigo-500 rounded-lg text-white">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                         </span>
-                        <span class="font-extrabold text-lg text-slate-800 dark:text-white tracking-tight">Mamun ISP</span>
+                        <span class="font-extrabold text-lg text-slate-800 dark:text-white tracking-tight">{{ config('app.name') }}</span>
                     </div>
                 </div>
 

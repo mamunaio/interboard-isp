@@ -33,6 +33,7 @@ Route::get('/subscriptions', SubscriptionIndex::class)->name('tenant.subscriptio
 Route::get('/subscriptions/actions', SubscriptionActions::class)->name('tenant.subscriptions.actions');
 Route::get('/plans', ServicePlanCrud::class)->name('tenant.plans.index');
 Route::get('/invoices', InvoiceIndex::class)->name('tenant.invoices.index');
+Route::get('/invoices/create', \App\Modules\Billing\Http\Livewire\InvoiceCreate::class)->name('tenant.invoices.create');
 Route::get('/payments/intake', PaymentIntake::class)->name('tenant.payments.intake');
 Route::get('/wallet', WalletIndex::class)->name('tenant.wallet.index');
 Route::get('/allocations', AllocationIndex::class)->name('tenant.allocations.index');

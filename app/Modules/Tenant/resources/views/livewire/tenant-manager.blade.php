@@ -110,7 +110,7 @@
             <form wire:submit="createTenant" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-300 mb-1">ISP / Company Name *</label>
-                    <input type="text" wire:model="tenantName" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500" placeholder="e.g. Mamun ISP" required>
+                    <input type="text" wire:model="tenantName" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500" placeholder="e.g. CodeNext ISP" required>
                     @error('tenantName') <span class="text-red-400 text-xs mt-1 block">{{ $message }}</span> @enderror
                 </div>
 
