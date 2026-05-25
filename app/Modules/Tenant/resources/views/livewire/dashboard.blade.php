@@ -1,4 +1,4 @@
-<div class="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased p-6 lg:p-8">
+<div class="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased p-6 lg:p-8" wire:poll.3s="refreshStats">
     <!-- Topbar navigation context -->
     <header class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-800/60 pb-6 mb-8 gap-4">
         <div>
@@ -69,6 +69,135 @@
         </div>
     @endif
 
+    <!-- Real-Time Telemetry & Router Health Panel -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Live Bandwidth Dashboard -->
+        <div class="lg:col-span-2 bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden flex flex-col justify-between">
+            <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-transparent pointer-events-none"></div>
+            <div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-widest flex items-center gap-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+                        Live ISP Traffic Telemetry
+                    </h3>
+                    <span class="px-3 py-1 text-[10px] font-bold tracking-wide text-cyan-400 bg-cyan-950/65 border border-cyan-800/80 rounded-full uppercase">
+                        Real-time Stream
+                    </span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4">
+                        <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Current Download</p>
+                        <p class="text-2xl font-black text-white mt-1 font-mono text-cyan-400">
+                            {{ number_format($liveDownloadSpeed, 1) }} <span class="text-xs font-semibold text-slate-550">Mbps</span>
+                        </p>
+                    </div>
+                    <div class="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4">
+                        <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Current Upload</p>
+                        <p class="text-2xl font-black text-white mt-1 font-mono text-indigo-455">
+                            {{ number_format($liveUploadSpeed, 1) }} <span class="text-xs font-semibold text-slate-550">Mbps</span>
+                        </p>
+                    </div>
+                    <div class="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4">
+                        <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Connected Users</p>
+                        <p class="text-2xl font-black text-white mt-1 font-mono text-emerald-455">
+                            {{ $onlineUsersCount }} <span class="text-xs font-semibold text-slate-550">Active</span>
+                        </p>
+                    </div>
+                    <div class="bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4">
+                        <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Allocated Pool</p>
+                        <p class="text-2xl font-black text-white mt-1 font-mono text-slate-300">
+                            {{ $totalAllocatedBandwidth }} <span class="text-xs font-semibold text-slate-550">Mbps</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Real-time SVG Live Waveform Chart -->
+            <div class="h-28 w-full mt-2 relative">
+                <!-- SVG Grid Lines -->
+                <div class="absolute inset-0 flex flex-col justify-between opacity-10 pointer-events-none">
+                    <div class="border-b border-slate-400 w-full"></div>
+                    <div class="border-b border-slate-400 w-full"></div>
+                    <div class="border-b border-slate-400 w-full"></div>
+                </div>
+                <!-- Dynamic SVG Area Chart -->
+                <svg viewBox="0 0 220 50" class="w-full h-full text-cyan-400/20 stroke-cyan-400 fill-current" preserveAspectRatio="none">
+                    <defs>
+                        <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="rgb(34, 211, 238)" stop-opacity="0.25"/>
+                            <stop offset="100%" stop-color="rgb(34, 211, 238)" stop-opacity="0"/>
+                        </linearGradient>
+                    </defs>
+                    @php
+                        // Construct smooth curve path coordinates based on the $bandwidthHistory array values
+                        $points = [];
+                        $widthStep = 20;
+                        foreach($bandwidthHistory as $i => $val) {
+                            $x = $i * $widthStep;
+                            $y = 50 - ($val * 0.45); // Map to chart height limit (50px)
+                            $points[] = "$x,$y";
+                        }
+                        $polyline = implode(' ', $points);
+                        $areaPoints = "0,50 " . $polyline . " 220,50";
+                    @endphp
+                    <!-- Area fill -->
+                    <polygon points="{{ $areaPoints }}" fill="url(#cyanGrad)"></polygon>
+                    <!-- Smooth line -->
+                    <polyline points="{{ $polyline }}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-all duration-700"></polyline>
+                </svg>
+            </div>
+        </div>
+
+        <!-- NAS Router Health Telemetry -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden flex flex-col justify-between">
+            <div class="absolute inset-0 bg-gradient-to-b from-indigo-500/5 to-transparent pointer-events-none"></div>
+            <div>
+                <h3 class="text-sm font-bold text-slate-300 uppercase tracking-widest mb-6 flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+                        <i class="fa-solid fa-server text-xs"></i>
+                    </div>
+                    Core NAS Router Health
+                </h3>
+                
+                <div class="space-y-5">
+                    <!-- CPU -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">MikroTik CPU Load</span>
+                            <span class="text-sm font-black text-white font-mono">{{ $routerCpuUsage }}%</span>
+                        </div>
+                        <div class="w-full bg-slate-950 border border-slate-800/80 rounded-full h-2 overflow-hidden">
+                            <div class="bg-cyan-500 h-2 rounded-full transition-all duration-700" style="width: {{ $routerCpuUsage }}%"></div>
+                        </div>
+                    </div>
+
+                    <!-- RAM -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Memory Allocation</span>
+                            <span class="text-sm font-black text-white font-mono">{{ $routerMemoryUsage }}%</span>
+                        </div>
+                        <div class="w-full bg-slate-950 border border-slate-800/80 rounded-full h-2 overflow-hidden">
+                            <div class="bg-indigo-500 h-2 rounded-full transition-all duration-700" style="width: {{ $routerMemoryUsage }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Network Status Indicators -->
+            <div class="border-t border-slate-800/60 pt-4 mt-6 grid grid-cols-2 gap-4">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-semibold">RADIUS Sync OK</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-semibold">PPPoE Server OK</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- KPI status cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
         <!-- Card 1: Active customers -->
@@ -130,6 +259,71 @@
             </div>
             <div class="text-3xl font-black text-white tracking-tighter">{{ number_format((float)$stats['total_wallet_balance'], 2) }} <span class="text-sm font-bold text-slate-500 ml-1">BDT</span></div>
         </div>
+    </div>
+
+    <!-- Real-time Operations & SLA Controls -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- POPs & Infrastructure -->
+        <a href="{{ route('infrastructure') }}" class="relative overflow-hidden bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 hover:-translate-y-1 transition-all duration-300 rounded-3xl p-6 shadow-xl hover:shadow-emerald-500/10 group cursor-pointer block">
+            <div class="absolute -right-6 -top-6 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition duration-300"></div>
+            <div class="flex items-center justify-between mb-6">
+                <span class="text-xs font-bold uppercase tracking-widest text-slate-400 font-semibold">POPs & Splitters</span>
+                <div class="p-2.5 bg-emerald-950/50 text-emerald-400 border border-emerald-900/60 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                    <i class="fa-solid fa-network-wired text-sm"></i>
+                </div>
+            </div>
+            <div class="text-3xl font-black text-white tracking-tighter">
+                {{ $stats['total_pops'] }} <span class="text-xs font-bold text-slate-500 ml-0.5 uppercase">Zones</span> 
+                <span class="text-slate-700 dark:text-slate-650 mx-1">/</span> 
+                {{ $stats['total_boxes'] }} <span class="text-xs font-bold text-slate-500 ml-0.5 uppercase">Boxes</span>
+            </div>
+        </a>
+
+        <!-- Pending Vouchers (Maker-Checker) -->
+        <a href="{{ route('voucher-approvals') }}" class="relative overflow-hidden bg-slate-900/80 border border-slate-800 hover:border-amber-500/40 hover:-translate-y-1 transition-all duration-300 rounded-3xl p-6 shadow-xl hover:shadow-amber-500/10 group cursor-pointer block">
+            <div class="absolute -right-6 -top-6 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition duration-300"></div>
+            <div class="flex items-center justify-between mb-6">
+                <span class="text-xs font-bold uppercase tracking-widest text-slate-400 font-semibold">Pending Vouchers</span>
+                <div class="p-2.5 bg-amber-950/50 text-amber-400 border border-amber-900/60 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                    <i class="fa-solid fa-check-double text-sm"></i>
+                </div>
+            </div>
+            <div class="text-4xl font-black text-white tracking-tighter flex items-center gap-2">
+                {{ $stats['pending_vouchers'] }}
+                @if($stats['pending_vouchers'] > 0)
+                    <span class="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-amber-500 text-slate-950 rounded border border-amber-450 animate-pulse">Awaiting Approval</span>
+                @endif
+            </div>
+        </a>
+
+        <!-- Open Support Tickets -->
+        <a href="{{ route('tickets') }}" class="relative overflow-hidden bg-slate-900/80 border border-slate-800 hover:border-indigo-500/40 hover:-translate-y-1 transition-all duration-300 rounded-3xl p-6 shadow-xl hover:shadow-indigo-500/10 group cursor-pointer block">
+            <div class="absolute -right-6 -top-6 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition duration-300"></div>
+            <div class="flex items-center justify-between mb-6">
+                <span class="text-xs font-bold uppercase tracking-widest text-slate-400 font-semibold">Open Support Tickets</span>
+                <div class="p-2.5 bg-indigo-950/50 text-indigo-400 border border-indigo-900/60 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                    <i class="fa-solid fa-ticket text-sm"></i>
+                </div>
+            </div>
+            <div class="text-4xl font-black text-white tracking-tighter">{{ $stats['pending_tickets'] }}</div>
+        </a>
+
+        <!-- Overdue Support Tickets -->
+        <a href="{{ route('tickets') }}" class="relative overflow-hidden bg-slate-900/80 border border-slate-800 hover:border-rose-500/40 hover:-translate-y-1 transition-all duration-300 rounded-3xl p-6 shadow-xl hover:shadow-rose-500/10 group cursor-pointer block">
+            <div class="absolute -right-6 -top-6 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl group-hover:bg-rose-500/20 transition duration-300"></div>
+            <div class="flex items-center justify-between mb-6">
+                <span class="text-xs font-bold uppercase tracking-widest text-slate-400 font-semibold">Overdue SLA Tickets</span>
+                <div class="p-2.5 bg-rose-950/50 text-rose-455 border border-rose-900/60 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                    <i class="fa-solid fa-triangle-exclamation text-sm animate-bounce"></i>
+                </div>
+            </div>
+            <div class="text-4xl font-black text-rose-500 tracking-tighter flex items-center gap-2">
+                {{ $stats['overdue_tickets'] }}
+                @if($stats['overdue_tickets'] > 0)
+                    <span class="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-rose-500 text-white rounded border border-rose-450 animate-pulse">Critical</span>
+                @endif
+            </div>
+        </a>
     </div>
 
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">

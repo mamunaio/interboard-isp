@@ -46,3 +46,9 @@ Route::get('/radius', RadiusConfigIndex::class)->name('tenant.radius.index');
 Route::get('/olts', OltManager::class)->name('tenant.olts.index');
 Route::get('/onu-provision', OnuProvisioner::class)->name('tenant.onu.index');
 Route::get('/financial-statements', FinancialStatementsIndex::class)->name('tenant.financial-statements.index');
+
+Route::get('/infrastructure', \App\Livewire\Network\InfrastructureManager::class)->name('infrastructure');
+Route::get('/route-matrix', \App\Livewire\Network\RouteMatrix::class)->name('route-matrix');
+Route::get('/tickets', \App\Livewire\Support\TicketManager::class)->name('tickets');
+Route::get('/voucher-approvals', \App\Livewire\Accounts\VoucherApproval::class)->name('voucher-approvals');
+Route::get('/btrc-report', \App\Livewire\Reports\BtrcReport::class)->name('btrc-report');

@@ -25,6 +25,7 @@ class Expense extends Model
     protected $casts = [
         'amount' => 'decimal:2',
         'expense_date' => 'date',
+        'approved_at' => 'datetime',
     ];
 
     /**
@@ -45,5 +46,15 @@ class Expense extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(\App\Modules\Auth\Models\StaffUser::class, 'user_id');
+    }
+
+    /**
+     * Get the user (checker) who approved the expense.
+     *
+     * @return BelongsTo
+     */
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(\App\Modules\Auth\Models\StaffUser::class, 'approved_by');
     }
 }

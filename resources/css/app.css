@@ -95,3 +95,77 @@ html:not(.dark) main textarea {
     color: #0f172a !important;
 }
 
+/* Sidebar Nav Scrollbar styling */
+.sidebar-nav {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.3s ease;
+}
+
+/* Chrome, Safari, and Opera custom scrollbar style */
+.sidebar-nav::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: transparent; /* Invisible by default */
+    border-radius: 9999px;
+    transition: background-color 0.3s ease;
+}
+
+/* Show scrollbar on hover of sidebar */
+.sidebar-nav:hover {
+    scrollbar-color: #334155 transparent; /* slate-700 */
+}
+
+.sidebar-nav:hover::-webkit-scrollbar-thumb {
+    background: #334155; /* slate-700 */
+}
+
+/* Hover effect directly on the scrollbar thumb */
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: #06b6d4 !important; /* cyan-500 */
+}
+
+/* Main Content Scrollbar styling (Right-side) */
+.main-content {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.3s ease;
+}
+
+/* Chrome, Safari, and Opera custom scrollbar style */
+.main-content::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.main-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.main-content::-webkit-scrollbar-thumb {
+    background: transparent; /* Invisible by default */
+    border-radius: 9999px;
+    transition: background-color 0.3s ease;
+}
+
+/* Show scrollbar on hover of main content area */
+.main-content:hover {
+    scrollbar-color: #334155 transparent; /* slate-700 */
+}
+
+.main-content:hover::-webkit-scrollbar-thumb {
+    background: #334155; /* slate-700 */
+}
+
+/* Hover effect directly on the main scrollbar thumb */
+.main-content::-webkit-scrollbar-thumb:hover {
+    background: #6366f1 !important; /* indigo-500 matching Save buttons */
+}
+

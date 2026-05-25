@@ -29,12 +29,16 @@ class Ticket extends Model
         'category',
         'status',
         'priority',
+        'sla_due_at',
+        'resolved_at',
     ];
 
     protected $casts = [
         'category' => TicketCategory::class,
         'status' => TicketStatus::class,
         'priority' => TicketPriority::class,
+        'sla_due_at' => 'datetime',
+        'resolved_at' => 'datetime',
     ];
 
     public function customer(): BelongsTo

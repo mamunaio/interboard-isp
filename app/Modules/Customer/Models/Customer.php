@@ -34,6 +34,7 @@ class Customer extends Model
         'tags',
         'referral_source',
         'status',
+        'distribution_box_id',
     ];
 
     protected $casts = [
@@ -83,6 +84,16 @@ class Customer extends Model
     public function subscriptions()
     {
         return $this->hasMany(CustomerServiceSubscription::class);
+    }
+
+    /**
+     * Get the distribution box connected to the customer.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Modules\Network\Models\DistributionBox, $this>
+     */
+    public function distributionBox(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Modules\Network\Models\DistributionBox::class, 'distribution_box_id');
     }
 }
 

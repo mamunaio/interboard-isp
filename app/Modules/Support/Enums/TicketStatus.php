@@ -10,6 +10,7 @@ enum TicketStatus: string
     case IN_PROGRESS = 'in_progress';
     case WAITING = 'waiting';
     case CLOSED = 'closed';
+    case RESOLVED = 'resolved';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum TicketStatus: string
             self::IN_PROGRESS => 'In Progress',
             self::WAITING => 'Waiting on Customer',
             self::CLOSED => 'Closed',
+            self::RESOLVED => 'Resolved',
         };
     }
 }
